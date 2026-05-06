@@ -1,0 +1,23 @@
+{
+  "overview": "TrendEdit AI is a template gallery app where users can browse AI-style photo templates, filter by category, search by title, apply templates to uploaded images with a fake processing animation, and manage templates via a protected admin dashboard.",
+  "features": [
+    "Template gallery with 6 pre-seeded templates",
+    "Filter tabs: All, Trending, Popular, New",
+    "Real-time search by title",
+    "Image upload flow with fake processing animation",
+    "Protected admin dashboard with CRUD for templates",
+    "Admin login at /admin-login with hardcoded credentials",
+    "localStorage persistence for templates and auth"
+  ],
+  "category": "productivity",
+  "tags": [
+    "ai",
+    "templates",
+    "photo-editing",
+    "gallery",
+    "admin",
+    "react",
+    "tailwind"
+  ],
+  "last_updated": "2026-05-05T19:03:59.644Z"
+}

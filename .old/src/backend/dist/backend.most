@@ -1,0 +1,22 @@
+// Version: 1.0.0
+type Nat__490723111 = Nat__920180692;
+type Nat__920180692 = Nat;
+type Template__286080210 = Template__810944557;
+type Template__810944557 =
+  {
+    category : Text;
+    id : Nat;
+    preview_image : Text;
+    prompt : Text;
+    tags : [Text];
+    title : Text
+  };
+actor {
+  stable var nextId : Nat;
+  stable templates :
+    {
+      var blockIndex : Nat__490723111;
+      var blocks : [var [var ?Template__286080210]];
+      var elementIndex : Nat__490723111
+    }
+};

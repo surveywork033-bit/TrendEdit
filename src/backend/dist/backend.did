@@ -1,0 +1,18 @@
+type Template = 
+ record {
+   category: text;
+   id: nat;
+   preview_image: text;
+   prompt: text;
+   tags: vec text;
+   title: text;
+ };
+service : {
+  addTemplate: (title: text, preview_image: text, prompt: text, category:
+   text, tags: vec text) -> (Template);
+  deleteTemplate: (id: nat) -> (bool);
+  getTemplate: (id: nat) -> (opt Template) query;
+  getTemplates: () -> (vec Template) query;
+  updateTemplate: (id: nat, title: text, preview_image: text, prompt: 
+   text, category: text, tags: vec text) -> (opt Template);
+}
