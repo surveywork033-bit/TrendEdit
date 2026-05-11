@@ -1,135 +1,100 @@
 import { FilterTabs } from "@/components/FilterTabs";
+import { PromptCard } from "@/components/PromptCard";
 import { SearchBar } from "@/components/SearchBar";
-import { TemplateCard } from "@/components/TemplateCard";
-import { UploadModal } from "@/components/UploadModal";
-import { useTemplateStore } from "@/store/useTemplateStore";
-import { Sparkles } from "lucide-react";
-import { AnimatePresence, motion } from "motion/react";
+import { usePromptStore } from "@/store/usePromptStore";
+import { useEffect, useMemo } from "react";
+import { useShallow } from "zustand/react/shallow";
 
-// ─── HomePage ─────────────────────────────────────────────────────────────────
 export default function HomePage() {
-  const {
-    activeFilter,
-    searchQuery,
-    isUploadModalOpen,
-    selectedTemplate,
-    setActiveFilter,
-    setSearchQuery,
-    openUploadModal,
-    closeUploadModal,
-    filteredTemplates,
-  } = useTemplateStore();
+  const { prompts, isLoading, activeFilter, searchQuery, fetchPrompts } =
+    usePromptStore(
+      useShallow((s) => ({
+        prompts: s.prompts,
+        isLoading: s.isLoading,
+        activeFilter: s.activeFilter,
+        searchQuery: s.searchQuery,
+        fetchPrompts: s.fetchPrompts,
+      })),
+    );
 
-  const shown = filteredTemplates();
-  const isEmpty = shown.length === 0;
+  useEffect(() => {
+    fetchPrompts();
+  }, [fetchPrompts]);
+
+  const filteredPrompts = useMemo(() => {
+    let result = prompts;
+    if (activeFilter !== "all") {
+      result = result.filter((p) => p.category === activeFilter);
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(
+        (p) =>
+          p.title.toLowerCase().includes(q) ||
+          p.prompt_text.toLowerCase().includes(q),
+      );
+    }
+    return result;
+  }, [prompts, activeFilter, searchQuery]);
 
   return (
-    <>
-      {/* ── Search + Filters ── */}
-      <section
-        className="px-4 pt-6 pb-2"
-        style={{ background: "oklch(0.07 0.01 261)" }}
-        data-ocid="home.search_section"
-      >
-        <div className="max-w-7xl mx-auto flex flex-col gap-4">
-          {/* Full-width search bar */}
-          <SearchBar value={searchQuery} onChange={setSearchQuery} />
+    <div className="min-h-screen bg-background" data-ocid="home.page">
+      {/* Top bar */}
+      <div className="sticky top-0 z-30 bg-background/80 backdrop-blur-xl border-b border-border/30 px-4 pt-4 pb-3 space-y-3">
+        {/* Branding */}
+        <div className="flex items-center gap-2">
+          <span className="font-display text-lg font-bold gradient-text-purple tracking-tight">
+            PromptVault
+          </span>
+          <span className="text-xs text-muted-foreground font-body opacity-70">
+            AI Prompt Gallery
+          </span>
+        </div>
 
-          {/* Filter tabs row */}
+        {/* Search */}
+        <SearchBar />
+
+        {/* Filter tabs */}
+        <FilterTabs />
+      </div>
+
+      {/* Masonry grid */}
+      <main className="px-3 pt-4 pb-24" data-ocid="home.list">
+        {isLoading ? (
           <div
-            className="flex items-center justify-between gap-4 flex-wrap pb-4 border-b"
-            style={{ borderColor: "oklch(0.20 0.01 265 / 0.5)" }}
+            className="flex flex-col items-center justify-center py-24 text-center"
+            data-ocid="home.loading_state"
           >
-            <FilterTabs active={activeFilter} onChange={setActiveFilter} />
-            <span className="text-xs" style={{ color: "oklch(0.45 0.01 260)" }}>
-              {shown.length} template{shown.length !== 1 ? "s" : ""}
-            </span>
+            <div
+              className="w-10 h-10 rounded-full border-2 border-t-transparent animate-spin mb-4"
+              style={{
+                borderColor: "oklch(0.72 0.26 264 / 0.6)",
+                borderTopColor: "transparent",
+              }}
+            />
+            <p className="text-sm text-muted-foreground">Loading prompts…</p>
           </div>
-        </div>
-      </section>
-
-      {/* ── Template Grid ── */}
-      <section
-        className="px-4 pb-20 pt-6"
-        style={{ background: "oklch(0.07 0.01 261)" }}
-        data-ocid="home.gallery_section"
-      >
-        <div className="max-w-7xl mx-auto">
-          {/* Grid */}
-          <div className="mt-6">
-            {/* Empty state */}
-            {isEmpty && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="flex flex-col items-center justify-center py-24 gap-4"
-                data-ocid="home.empty_state"
-              >
-                <div
-                  className="w-16 h-16 rounded-2xl flex items-center justify-center"
-                  style={{
-                    background: "oklch(0.14 0.015 265)",
-                    border: "1px solid oklch(0.28 0.02 265 / 0.4)",
-                  }}
-                >
-                  <Sparkles
-                    className="w-7 h-7"
-                    style={{ color: "oklch(0.50 0.01 260)" }}
-                  />
-                </div>
-                <p
-                  className="font-display font-medium text-sm"
-                  style={{ color: "oklch(0.60 0.01 260)" }}
-                >
-                  No templates match your search.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSearchQuery("");
-                    setActiveFilter("all");
-                  }}
-                  className="px-4 py-2 rounded-xl text-sm font-medium transition-smooth"
-                  style={{
-                    background: "oklch(0.68 0.28 264 / 0.1)",
-                    color: "oklch(0.68 0.28 264)",
-                    border: "1px solid oklch(0.68 0.28 264 / 0.3)",
-                  }}
-                  data-ocid="home.empty_state.reset_button"
-                >
-                  Clear filters
-                </button>
-              </motion.div>
-            )}
-
-            {/* Template grid */}
-            {!isEmpty && (
-              <motion.div
-                layout
-                className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4"
-              >
-                <AnimatePresence mode="popLayout">
-                  {shown.map((template, i) => (
-                    <TemplateCard
-                      key={template.id}
-                      template={template}
-                      index={i}
-                      onClick={openUploadModal}
-                    />
-                  ))}
-                </AnimatePresence>
-              </motion.div>
-            )}
+        ) : filteredPrompts.length === 0 ? (
+          <div
+            className="flex flex-col items-center justify-center py-24 text-center"
+            data-ocid="home.empty_state"
+          >
+            <span className="text-5xl mb-4">✨</span>
+            <p className="font-display text-lg font-semibold text-foreground mb-1">
+              No prompts yet
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Add your first prompt from the Admin panel
+            </p>
           </div>
-        </div>
-      </section>
-
-      {/* ── Upload Modal ── */}
-      <AnimatePresence>
-        {isUploadModalOpen && selectedTemplate && (
-          <UploadModal template={selectedTemplate} onClose={closeUploadModal} />
+        ) : (
+          <div className="columns-2 gap-3 sm:columns-2 md:columns-3 lg:columns-4">
+            {filteredPrompts.map((prompt, index) => (
+              <PromptCard key={prompt.id} prompt={prompt} index={index} />
+            ))}
+          </div>
         )}
-      </AnimatePresence>
-    </>
+      </main>
+    </div>
   );
 }

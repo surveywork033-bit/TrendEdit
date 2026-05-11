@@ -1,5 +1,4 @@
 import { Layout } from "@/components/Layout";
-import { ProtectedRoute } from "@/components/ProtectedRoute";
 import {
   Outlet,
   createRootRoute,
@@ -9,8 +8,9 @@ import {
 import { Suspense, lazy } from "react";
 
 const HomePage = lazy(() => import("@/pages/HomePage"));
-const AdminLoginPage = lazy(() => import("@/pages/AdminLoginPage"));
+const ProfilePage = lazy(() => import("@/pages/ProfilePage"));
 const AdminPage = lazy(() => import("@/pages/AdminPage"));
+const AdminLoginPage = lazy(() => import("@/pages/AdminLoginPage"));
 
 const PageLoader = () => (
   <div className="flex items-center justify-center min-h-[60vh]">
@@ -40,28 +40,29 @@ const indexRoute = createRoute({
   component: () => <HomePage />,
 });
 
+const profileRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/profile",
+  component: () => <ProfilePage />,
+});
+
+const adminRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/admin",
+  component: () => <AdminPage />,
+});
+
 const adminLoginRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/admin-login",
   component: () => <AdminLoginPage />,
 });
 
-const protectedRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  id: "protected",
-  component: ProtectedRoute,
-});
-
-const adminRoute = createRoute({
-  getParentRoute: () => protectedRoute,
-  path: "/admin",
-  component: () => <AdminPage />,
-});
-
 const routeTree = rootRoute.addChildren([
   indexRoute,
+  profileRoute,
+  adminRoute,
   adminLoginRoute,
-  protectedRoute.addChildren([adminRoute]),
 ]);
 
 export const router = createRouter({ routeTree });

@@ -1,29 +1,33 @@
 import { create } from "zustand";
 
-const STORAGE_KEY = "admin_authenticated";
-const ADMIN_EMAIL = "admin@test.com";
-const ADMIN_PASSWORD = "123456";
-
 interface AuthStore {
   isAuthenticated: boolean;
   login: (email: string, password: string) => boolean;
   logout: () => void;
 }
 
-export const useAuthStore = create<AuthStore>(() => ({
-  isAuthenticated: localStorage.getItem(STORAGE_KEY) === "true",
+function loadAuth(): boolean {
+  try {
+    return localStorage.getItem("promptvault_auth") === "true";
+  } catch {
+    return false;
+  }
+}
+
+export const useAuthStore = create<AuthStore>((set) => ({
+  isAuthenticated: loadAuth(),
 
   login: (email, password) => {
-    if (email === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
-      localStorage.setItem(STORAGE_KEY, "true");
-      useAuthStore.setState({ isAuthenticated: true });
+    if (email === "admin@test.com" && password === "123456") {
+      localStorage.setItem("promptvault_auth", "true");
+      set({ isAuthenticated: true });
       return true;
     }
     return false;
   },
 
   logout: () => {
-    localStorage.removeItem(STORAGE_KEY);
-    useAuthStore.setState({ isAuthenticated: false });
+    localStorage.removeItem("promptvault_auth");
+    set({ isAuthenticated: false });
   },
 }));

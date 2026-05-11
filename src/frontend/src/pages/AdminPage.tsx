@@ -1,516 +1,496 @@
-import { TemplateForm } from "@/components/TemplateForm";
-import { Button } from "@/components/ui/button";
-import { useAuthStore } from "@/store/useAuthStore";
-import { useTemplateStore } from "@/store/useTemplateStore";
-import type { AdminTemplateForm, Template } from "@/types/template";
-import { useNavigate } from "@tanstack/react-router";
-import {
-  Edit2,
-  FolderPlus,
-  LogOut,
-  Sparkles,
-  Trash2,
-  X,
-  Zap,
-} from "lucide-react";
-import { useState } from "react";
+import { usePromptStore } from "@/store/usePromptStore";
+import type { Prompt } from "@/types/prompt";
+import { useRouter } from "@tanstack/react-router";
+import { Edit2, Loader2, LogOut, Plus, Save, Trash2, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
 
-type DialogState =
-  | { mode: "closed" }
-  | { mode: "add" }
-  | { mode: "edit"; template: Template }
-  | { mode: "confirm_delete"; id: string; title: string };
-
-const CATEGORY_STYLES: Record<
-  string,
-  { bg: string; color: string; icon: string }
-> = {
-  trending: {
-    bg: "oklch(0.65 0.28 264 / 0.22)",
-    color: "oklch(0.80 0.26 264)",
-    icon: "\uD83D\uDD25",
-  },
-  popular: {
-    bg: "oklch(0.75 0.28 280 / 0.22)",
-    color: "oklch(0.85 0.26 280)",
-    icon: "\u2728",
-  },
-  new: {
-    bg: "oklch(0.72 0.27 85 / 0.22)",
-    color: "oklch(0.85 0.26 85)",
-    icon: "\uD83C\uDD95",
-  },
+type PromptForm = {
+  title: string;
+  image_url: string;
+  prompt_text: string;
+  category: Prompt["category"];
 };
 
-function StatCard({
-  label,
-  value,
-  accent,
-}: {
-  label: string;
-  value: number;
-  accent: string;
-}) {
+const emptyForm: PromptForm = {
+  title: "",
+  image_url: "",
+  prompt_text: "",
+  category: "trending",
+};
+
+const FALLBACK_IMG =
+  "https://images.unsplash.com/photo-1682686580391-615b1f28e5ee?w=200&q=60";
+
+function AdminImagePreview({ url }: { url: string }) {
+  const [src, setSrc] = useState(url);
+  const [errored, setErrored] = useState(false);
+
+  useEffect(() => {
+    setSrc(url || FALLBACK_IMG);
+    setErrored(false);
+  }, [url]);
+
+  if (!url) return null;
+
   return (
     <div
-      className="rounded-xl px-5 py-4 flex flex-col gap-1 flex-1 min-w-[110px]"
+      className="mt-2 w-full rounded-xl overflow-hidden relative"
       style={{
-        background: "oklch(0.13 0.01 265 / 0.7)",
-        border: `1px solid ${accent}40`,
-        boxShadow: `0 0 18px ${accent}15`,
+        background: "oklch(0.08 0.01 265 / 0.5)",
+        border: "1px solid oklch(0.22 0.01 265 / 0.3)",
       }}
     >
-      <span
-        className="text-2xl font-bold font-display"
-        style={{ color: accent }}
-      >
-        {value}
-      </span>
-      <span className="text-xs" style={{ color: "oklch(0.56 0.01 260)" }}>
-        {label}
-      </span>
+      <img
+        src={src}
+        alt="Preview"
+        loading="lazy"
+        onError={() => {
+          if (!errored) {
+            setErrored(true);
+            setSrc(FALLBACK_IMG);
+          }
+        }}
+        className="w-full h-auto max-h-48 object-contain block"
+      />
+      {errored && (
+        <p
+          className="text-center text-xs py-2"
+          style={{ color: "oklch(0.70 0.22 25)" }}
+        >
+          ⚠️ Image failed to load — URL may be invalid
+        </p>
+      )}
     </div>
   );
 }
 
 export default function AdminPage() {
-  const logout = useAuthStore((s) => s.logout);
-  const navigate = useNavigate();
-  const { templates, addTemplate, updateTemplate, deleteTemplate } =
-    useTemplateStore();
+  const router = useRouter();
+  const { prompts, addPrompt, updatePrompt, deletePrompt, fetchPrompts } =
+    usePromptStore();
 
-  const [dialog, setDialog] = useState<DialogState>({ mode: "closed" });
+  // Auth guard
+  useEffect(() => {
+    if (!localStorage.getItem("promptvault_admin")) {
+      router.navigate({ to: "/admin-login" });
+    } else {
+      fetchPrompts();
+    }
+  }, [router, fetchPrompts]);
+
+  const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [form, setForm] = useState<PromptForm>(emptyForm);
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-
-  const counts = {
-    total: templates.length,
-    trending: templates.filter((t) => t.category === "trending").length,
-    popular: templates.filter((t) => t.category === "popular").length,
-    new: templates.filter((t) => t.category === "new").length,
-  };
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const handleLogout = () => {
-    logout();
-    navigate({ to: "/admin-login" });
+    localStorage.removeItem("promptvault_admin");
+    router.navigate({ to: "/" });
   };
 
-  const handleSave = async (data: AdminTemplateForm) => {
+  const openAdd = () => {
+    setEditingId(null);
+    setForm(emptyForm);
+    setShowForm(true);
+  };
+
+  const openEdit = (p: Prompt) => {
+    setEditingId(p.id);
+    setForm({
+      title: p.title,
+      image_url: p.image_url,
+      prompt_text: p.prompt_text,
+      category: p.category,
+    });
+    setShowForm(true);
+  };
+
+  const closeForm = () => {
+    setShowForm(false);
+    setEditingId(null);
+    setForm(emptyForm);
+  };
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
     setIsSaving(true);
-    await new Promise((r) => setTimeout(r, 350));
-    if (dialog.mode === "add") {
-      addTemplate({
-        ...data,
-        id: Date.now().toString(),
-        tags: data.tags ?? [],
-      });
-    } else if (dialog.mode === "edit") {
-      updateTemplate({
-        ...data,
-        id: dialog.template.id,
-        tags: data.tags ?? [],
-      });
+    try {
+      if (editingId) {
+        await updatePrompt(editingId, form);
+        toast.success("Prompt updated successfully!");
+      } else {
+        await addPrompt(form);
+        toast.success("Prompt added successfully!");
+      }
+      closeForm();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Unknown error";
+      toast.error(msg);
+    } finally {
+      setIsSaving(false);
     }
-    setIsSaving(false);
-    setDialog({ mode: "closed" });
   };
 
-  const handleDelete = () => {
-    if (dialog.mode !== "confirm_delete") return;
-    deleteTemplate(dialog.id);
-    setDialog({ mode: "closed" });
+  const handleDelete = async (id: string) => {
+    setIsDeleting(true);
+    try {
+      await deletePrompt(id);
+      toast.success("Prompt deleted.");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Unknown error";
+      toast.error(msg);
+    } finally {
+      setIsDeleting(false);
+      setConfirmDelete(null);
+    }
   };
-
-  const isDialogOpen = dialog.mode === "add" || dialog.mode === "edit";
-  const isConfirmOpen = dialog.mode === "confirm_delete";
 
   return (
     <div
-      className="min-h-screen"
+      className="min-h-screen pb-8"
       style={{ background: "oklch(0.06 0 0)" }}
       data-ocid="admin.page"
     >
-      <div
-        className="fixed inset-0 pointer-events-none"
-        style={{
-          background:
-            "radial-gradient(ellipse 60% 30% at 50% 0%, oklch(0.68 0.28 264 / 0.06) 0%, transparent 70%)",
-        }}
-      />
-
       {/* Header */}
-      <header
-        className="sticky top-0 z-30 flex items-center justify-between px-6 py-4"
+      <div
+        className="sticky top-0 z-30 flex items-center justify-between px-4 py-4 border-b"
         style={{
-          background: "oklch(0.10 0.01 265 / 0.94)",
-          borderBottom: "1px solid oklch(0.22 0.01 265 / 0.7)",
-          backdropFilter: "blur(16px)",
+          background: "oklch(0.09 0.01 265 / 0.95)",
+          backdropFilter: "blur(20px)",
+          borderColor: "oklch(0.22 0.01 265 / 0.4)",
         }}
-        data-ocid="admin.header"
       >
         <div className="flex items-center gap-3">
-          <div
-            className="flex items-center justify-center w-9 h-9 rounded-xl"
+          <span className="font-display text-base font-bold gradient-text-purple">
+            Admin Dashboard
+          </span>
+          <span
+            className="text-[10px] font-bold px-2 py-0.5 rounded-full"
             style={{
-              background: "oklch(0.68 0.28 264 / 0.15)",
-              border: "1px solid oklch(0.68 0.28 264 / 0.3)",
+              background: "oklch(0.72 0.26 264 / 0.2)",
+              color: "oklch(0.82 0.24 264)",
+              border: "1px solid oklch(0.72 0.26 264 / 0.35)",
             }}
           >
-            <Sparkles
-              className="w-5 h-5"
-              style={{ color: "oklch(0.72 0.27 200)" }}
-            />
-          </div>
-          <div>
-            <h1
-              className="text-lg font-bold font-display leading-none"
-              style={{ color: "oklch(0.95 0.01 240)" }}
-            >
-              Admin Dashboard
-            </h1>
-            <p
-              className="text-xs mt-0.5"
-              style={{ color: "oklch(0.50 0.01 260)" }}
-            >
-              Manage AI templates
-            </p>
-          </div>
+            {prompts.length} prompts
+          </span>
         </div>
-
-        <div className="flex items-center gap-3">
-          <Button
+        <div className="flex gap-2">
+          <button
             type="button"
-            data-ocid="admin.add_template_button"
-            onClick={() => setDialog({ mode: "add" })}
-            className="flex items-center gap-2 font-semibold"
+            onClick={openAdd}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl font-display font-semibold text-xs"
             style={{
-              background: "oklch(0.72 0.27 200)",
+              background: "oklch(0.72 0.26 264)",
               color: "oklch(0.06 0 0)",
+              boxShadow: "0 0 16px oklch(0.72 0.26 264 / 0.4)",
             }}
+            data-ocid="admin.primary_button"
           >
-            <FolderPlus className="w-4 h-4" />
-            Add Template
-          </Button>
-          <Button
+            <Plus size={14} />
+            Add Prompt
+          </button>
+          <button
             type="button"
-            variant="outline"
-            data-ocid="admin.logout_button"
             onClick={handleLogout}
-            className="flex items-center gap-2"
-            style={{
-              borderColor: "oklch(0.28 0.01 265)",
-              color: "oklch(0.60 0.01 260)",
-            }}
+            className="btn-icon-neon"
+            aria-label="Logout"
+            data-ocid="admin.secondary_button"
           >
-            <LogOut className="w-4 h-4" />
-            Logout
-          </Button>
+            <LogOut size={14} />
+          </button>
         </div>
-      </header>
+      </div>
 
-      <main className="relative z-10 max-w-7xl mx-auto px-6 py-8">
-        {/* Stats row */}
-        <section className="flex flex-wrap gap-3 mb-8" data-ocid="admin.stats">
-          <StatCard
-            label="Total Templates"
-            value={counts.total}
-            accent="oklch(0.72 0.27 200)"
-          />
-          <StatCard
-            label="Trending \uD83D\uDD25"
-            value={counts.trending}
-            accent="oklch(0.72 0.27 264)"
-          />
-          <StatCard
-            label="Popular \u2728"
-            value={counts.popular}
-            accent="oklch(0.78 0.27 280)"
-          />
-          <StatCard
-            label="New \uD83C\uDD95"
-            value={counts.new}
-            accent="oklch(0.82 0.25 85)"
-          />
-        </section>
-
-        {/* Template grid */}
-        {templates.length === 0 ? (
+      {/* Prompt list */}
+      <div className="px-4 pt-4 space-y-3" data-ocid="admin.list">
+        {prompts.map((p, i) => (
           <div
-            data-ocid="admin.empty_state"
-            className="flex flex-col items-center justify-center py-24 rounded-2xl"
-            style={{ border: "1.5px dashed oklch(0.26 0.01 265)" }}
+            key={p.id}
+            className="flex gap-3 items-start rounded-xl p-3"
+            style={{
+              background: "oklch(0.1 0.01 265 / 0.5)",
+              border: "1px solid oklch(0.2 0.01 265 / 0.3)",
+            }}
+            data-ocid={`admin.item.${i + 1}`}
           >
-            <Zap
-              className="w-12 h-12 mb-4"
-              style={{ color: "oklch(0.40 0.01 260)" }}
-            />
-            <p
-              className="text-lg font-semibold font-display"
-              style={{ color: "oklch(0.58 0.01 260)" }}
-            >
-              No templates yet
-            </p>
-            <p
-              className="text-sm mt-1 mb-6"
-              style={{ color: "oklch(0.42 0.01 260)" }}
-            >
-              Create your first AI template to get started
-            </p>
-            <Button
-              type="button"
-              data-ocid="admin.empty_state.add_button"
-              onClick={() => setDialog({ mode: "add" })}
-              style={{
-                background: "oklch(0.72 0.27 200)",
-                color: "oklch(0.06 0 0)",
+            {/* Thumbnail */}
+            <img
+              src={p.image_url}
+              alt={p.title}
+              className="w-16 h-16 rounded-lg object-cover shrink-0"
+              onError={(e) => {
+                (e.target as HTMLImageElement).src =
+                  "https://images.unsplash.com/photo-1519681393784-d120267933ba?w=200&q=60";
               }}
-            >
-              <FolderPlus className="w-4 h-4 mr-2" />
-              Add First Template
-            </Button>
-          </div>
-        ) : (
-          <div
-            className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
-            data-ocid="admin.template_list"
-          >
-            {templates.map((template, idx) => {
-              const cat =
-                CATEGORY_STYLES[template.category] ?? CATEGORY_STYLES.trending;
-              return (
-                <div
-                  key={template.id}
-                  data-ocid={`admin.template_card.item.${idx + 1}`}
-                  className="rounded-xl overflow-hidden group"
-                  style={{
-                    background: "oklch(0.12 0.01 265 / 0.7)",
-                    border: "1px solid oklch(0.22 0.01 265 / 0.7)",
-                    transition: "border-color 0.2s, box-shadow 0.2s",
-                  }}
-                >
-                  <div className="relative h-40 overflow-hidden">
-                    <img
-                      src={template.preview_image}
-                      alt={template.title}
-                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src =
-                          "https://images.unsplash.com/photo-1518791841217-8f162f1912da?w=600&q=80&fit=crop";
-                      }}
-                    />
-                    <div
-                      className="absolute inset-0"
-                      style={{
-                        background:
-                          "linear-gradient(to top, oklch(0.08 0 0 / 0.7) 0%, transparent 60%)",
-                      }}
-                    />
-                    <span
-                      className="absolute top-3 left-3 px-2.5 py-1 rounded-full text-xs font-bold capitalize"
-                      style={{
-                        background: cat.bg,
-                        color: cat.color,
-                        border: `1px solid ${cat.color}55`,
-                      }}
-                    >
-                      {cat.icon} {template.category}
-                    </span>
-                  </div>
+            />
 
-                  <div className="p-4">
-                    <h3
-                      className="font-semibold font-display text-sm mb-1 truncate"
-                      style={{ color: "oklch(0.94 0.01 240)" }}
-                    >
-                      {template.title}
-                    </h3>
-                    <p
-                      className="text-xs line-clamp-2 mb-4"
-                      style={{ color: "oklch(0.54 0.01 260)" }}
-                    >
-                      {template.prompt}
-                    </p>
-                    <div className="flex gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        data-ocid={`admin.template_card.edit_button.${idx + 1}`}
-                        onClick={() => setDialog({ mode: "edit", template })}
-                        className="flex-1 flex items-center justify-center gap-1.5 text-xs"
-                        style={{
-                          borderColor: "oklch(0.28 0.01 265)",
-                          color: "oklch(0.72 0.27 200)",
-                        }}
-                      >
-                        <Edit2 className="w-3.5 h-3.5" />
-                        Edit
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        data-ocid={`admin.template_card.delete_button.${idx + 1}`}
-                        onClick={() =>
-                          setDialog({
-                            mode: "confirm_delete",
-                            id: template.id,
-                            title: template.title,
-                          })
-                        }
-                        className="flex-1 flex items-center justify-center gap-1.5 text-xs"
-                        style={{
-                          background: "oklch(0.55 0.28 25 / 0.15)",
-                          color: "oklch(0.78 0.18 25)",
-                          border: "1px solid oklch(0.55 0.28 25 / 0.35)",
-                        }}
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                        Delete
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </main>
+            {/* Info */}
+            <div className="flex-1 min-w-0">
+              <p className="font-display text-sm font-semibold text-foreground truncate">
+                {p.title}
+              </p>
+              <span
+                className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full"
+                style={{
+                  background:
+                    p.category === "trending"
+                      ? "oklch(0.72 0.26 264 / 0.2)"
+                      : p.category === "popular"
+                        ? "oklch(0.75 0.28 280 / 0.2)"
+                        : "oklch(0.55 0.2 142 / 0.2)",
+                  color:
+                    p.category === "trending"
+                      ? "oklch(0.82 0.24 264)"
+                      : p.category === "popular"
+                        ? "oklch(0.85 0.26 280)"
+                        : "oklch(0.78 0.2 142)",
+                }}
+              >
+                {p.category}
+              </span>
+              <p className="text-xs text-muted-foreground mt-1 line-clamp-2 font-body">
+                {p.prompt_text}
+              </p>
+            </div>
 
-      {/* Add / Edit Dialog */}
-      {isDialogOpen && (
+            {/* Actions */}
+            <div className="flex flex-col gap-1.5 shrink-0">
+              <button
+                type="button"
+                className="btn-icon-neon w-8 h-8"
+                onClick={() => openEdit(p)}
+                aria-label="Edit"
+                data-ocid={`admin.edit_button.${i + 1}`}
+              >
+                <Edit2 size={12} />
+              </button>
+              <button
+                type="button"
+                className="btn-icon-neon w-8 h-8"
+                onClick={() => setConfirmDelete(p.id)}
+                aria-label="Delete"
+                style={{ color: "oklch(0.70 0.22 25)" }}
+                data-ocid={`admin.delete_button.${i + 1}`}
+              >
+                <Trash2 size={12} />
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Add / Edit Form Modal */}
+      {showForm && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{
-            background: "oklch(0.04 0 0 / 0.75)",
-            backdropFilter: "blur(4px)",
-          }}
-          data-ocid="admin.template_form.dialog"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setDialog({ mode: "closed" });
-          }}
-          onKeyDown={(e) => {
-            if (e.key === "Escape") setDialog({ mode: "closed" });
-          }}
-          role="presentation"
+          style={{ background: "rgba(0,0,0,0.8)", backdropFilter: "blur(8px)" }}
+          data-ocid="admin.dialog"
         >
           <div
-            className="relative w-full max-w-md rounded-2xl p-6"
+            className="w-full max-w-lg rounded-2xl p-6 space-y-4"
             style={{
-              background: "oklch(0.13 0.01 265 / 0.96)",
-              border: "1px solid oklch(0.26 0.01 265 / 0.7)",
-              boxShadow: "0 30px 70px rgba(0,0,0,0.6)",
-              backdropFilter: "blur(20px)",
+              background: "oklch(0.1 0.01 265 / 0.98)",
+              border: "1px solid oklch(0.28 0.02 265 / 0.4)",
+              boxShadow: "0 0 50px oklch(0.75 0.28 280 / 0.2)",
+              maxHeight: "90vh",
+              overflowY: "auto",
             }}
           >
-            <div className="flex items-center justify-between mb-5">
-              <h2
-                className="text-base font-bold font-display"
-                style={{ color: "oklch(0.94 0.01 240)" }}
-              >
-                {dialog.mode === "add" ? "Add New Template" : "Edit Template"}
+            <div className="flex items-center justify-between">
+              <h2 className="font-display text-base font-bold text-foreground">
+                {editingId ? "Edit Prompt" : "Add New Prompt"}
               </h2>
               <button
                 type="button"
-                data-ocid="admin.template_form.close_button"
-                onClick={() => setDialog({ mode: "closed" })}
-                className="rounded-lg p-1"
-                style={{ color: "oklch(0.52 0.01 260)" }}
+                className="btn-icon-neon w-8 h-8"
+                onClick={closeForm}
                 aria-label="Close"
+                data-ocid="admin.close_button"
               >
-                <X className="w-5 h-5" />
+                <X size={14} />
               </button>
             </div>
-            <TemplateForm
-              initial={
-                dialog.mode === "edit"
-                  ? {
-                      title: dialog.template.title,
-                      preview_image: dialog.template.preview_image,
-                      prompt: dialog.template.prompt,
-                      category: dialog.template.category,
-                      tags: dialog.template.tags ?? [],
-                    }
-                  : undefined
-              }
-              onSave={handleSave}
-              onCancel={() => setDialog({ mode: "closed" })}
-              isSaving={isSaving}
-            />
+
+            <form onSubmit={handleSave} className="space-y-4">
+              <div className="space-y-1">
+                <label
+                  htmlFor="f-title"
+                  className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider"
+                >
+                  Title
+                </label>
+                <input
+                  id="f-title"
+                  type="text"
+                  value={form.title}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, title: e.target.value }))
+                  }
+                  className="input-glass w-full rounded-xl px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/40"
+                  placeholder="Cinematic Dragon at Dawn"
+                  required
+                  data-ocid="admin.title_input"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label
+                  htmlFor="f-image"
+                  className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider"
+                >
+                  Image URL
+                </label>
+                <input
+                  id="f-image"
+                  type="url"
+                  value={form.image_url}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, image_url: e.target.value }))
+                  }
+                  className="input-glass w-full rounded-xl px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/40"
+                  placeholder="https://i.ibb.co/... or https://i.postimg.cc/..."
+                  data-ocid="admin.image_input"
+                />
+                <AdminImagePreview url={form.image_url} />
+              </div>
+
+              <div className="space-y-1">
+                <label
+                  htmlFor="f-prompt"
+                  className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider"
+                >
+                  Full Prompt
+                </label>
+                <textarea
+                  id="f-prompt"
+                  value={form.prompt_text}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, prompt_text: e.target.value }))
+                  }
+                  rows={4}
+                  className="input-glass w-full rounded-xl px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/40 resize-none"
+                  placeholder="Detailed AI image generation prompt..."
+                  required
+                  data-ocid="admin.prompt_textarea"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label
+                  htmlFor="f-category"
+                  className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider"
+                >
+                  Category
+                </label>
+                <select
+                  id="f-category"
+                  value={form.category}
+                  onChange={(e) =>
+                    setForm((f) => ({
+                      ...f,
+                      category: e.target.value as Prompt["category"],
+                    }))
+                  }
+                  className="input-glass w-full rounded-xl px-4 py-2.5 text-sm text-foreground"
+                  data-ocid="admin.category_select"
+                >
+                  <option value="trending">🔥 Trending</option>
+                  <option value="popular">✨ Popular</option>
+                  <option value="new">🆕 New</option>
+                </select>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="submit"
+                  className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-display font-semibold text-sm"
+                  style={{
+                    background: "oklch(0.72 0.26 264)",
+                    color: "oklch(0.06 0 0)",
+                    boxShadow: "0 0 20px oklch(0.72 0.26 264 / 0.45)",
+                  }}
+                  data-ocid="admin.save_button"
+                >
+                  {isSaving ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : (
+                    <Save size={14} />
+                  )}
+                  {isSaving
+                    ? "Saving…"
+                    : editingId
+                      ? "Save Changes"
+                      : "Add Prompt"}
+                </button>
+                <button
+                  type="button"
+                  className="btn-neon px-4 rounded-xl"
+                  onClick={closeForm}
+                  data-ocid="admin.cancel_button"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
 
-      {/* Delete Confirmation */}
-      {isConfirmOpen && dialog.mode === "confirm_delete" && (
+      {/* Delete Confirm Modal */}
+      {confirmDelete && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4"
           style={{
-            background: "oklch(0.04 0 0 / 0.75)",
-            backdropFilter: "blur(4px)",
+            background: "rgba(0,0,0,0.85)",
+            backdropFilter: "blur(8px)",
           }}
-          data-ocid="admin.delete_confirm.dialog"
         >
           <div
-            className="w-full max-w-sm rounded-2xl p-6"
+            className="w-full max-w-xs rounded-2xl p-6 text-center space-y-4"
             style={{
-              background: "oklch(0.13 0.01 265 / 0.96)",
-              border: "1px solid oklch(0.55 0.28 25 / 0.35)",
-              boxShadow: "0 30px 70px rgba(0,0,0,0.6)",
-              backdropFilter: "blur(20px)",
+              background: "oklch(0.1 0.01 265 / 0.98)",
+              border: "1px solid oklch(0.55 0.22 25 / 0.4)",
+              boxShadow: "0 0 40px oklch(0.55 0.22 25 / 0.2)",
             }}
           >
-            <div
-              className="flex items-center justify-center w-12 h-12 rounded-full mx-auto mb-4"
-              style={{
-                background: "oklch(0.55 0.28 25 / 0.15)",
-                border: "1px solid oklch(0.55 0.28 25 / 0.4)",
-              }}
-            >
-              <Trash2
-                className="w-6 h-6"
-                style={{ color: "oklch(0.78 0.18 25)" }}
-              />
-            </div>
-            <h2
-              className="text-base font-bold font-display text-center mb-1"
-              style={{ color: "oklch(0.94 0.01 240)" }}
-            >
-              Delete Template?
-            </h2>
-            <p
-              className="text-sm text-center mb-6"
-              style={{ color: "oklch(0.58 0.01 260)" }}
-            >
-              <span style={{ color: "oklch(0.80 0.01 240)" }}>
-                “{dialog.title}”
-              </span>{" "}
-              will be permanently deleted.
+            <div className="text-3xl">🗑️</div>
+            <p className="font-display font-semibold text-sm text-foreground">
+              Delete this prompt?
+            </p>
+            <p className="text-xs text-muted-foreground">
+              This action cannot be undone.
             </p>
             <div className="flex gap-3">
-              <Button
+              <button
                 type="button"
-                variant="outline"
-                data-ocid="admin.delete_confirm.cancel_button"
-                onClick={() => setDialog({ mode: "closed" })}
-                className="flex-1"
+                className="flex-1 py-2.5 rounded-xl font-display font-semibold text-xs"
                 style={{
-                  borderColor: "oklch(0.28 0.01 265)",
-                  color: "oklch(0.62 0.01 260)",
+                  background: "oklch(0.55 0.22 25 / 0.25)",
+                  color: "oklch(0.78 0.22 25)",
+                  border: "1px solid oklch(0.55 0.22 25 / 0.4)",
                 }}
+                onClick={() => handleDelete(confirmDelete)}
+                disabled={isDeleting}
+                data-ocid="admin.confirm_button"
+              >
+                {isDeleting ? (
+                  <Loader2 size={12} className="animate-spin mx-auto" />
+                ) : (
+                  "Delete"
+                )}
+              </button>
+              <button
+                type="button"
+                className="flex-1 btn-neon py-2.5 rounded-xl text-xs"
+                onClick={() => setConfirmDelete(null)}
+                data-ocid="admin.cancel_button"
               >
                 Cancel
-              </Button>
-              <Button
-                type="button"
-                data-ocid="admin.delete_confirm.confirm_button"
-                onClick={handleDelete}
-                className="flex-1 font-semibold"
-                style={{
-                  background: "oklch(0.55 0.28 25)",
-                  color: "oklch(0.98 0.01 0)",
-                }}
-              >
-                Delete
-              </Button>
+              </button>
             </div>
           </div>
         </div>

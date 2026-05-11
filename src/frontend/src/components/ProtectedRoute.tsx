@@ -1,10 +1,14 @@
 import { useAuthStore } from "@/store/useAuthStore";
-import { Navigate, Outlet } from "@tanstack/react-router";
+import { Navigate } from "@tanstack/react-router";
 
-export function ProtectedRoute() {
+interface ProtectedRouteProps {
+  children: React.ReactNode;
+}
+
+export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   if (!isAuthenticated) {
     return <Navigate to="/admin-login" />;
   }
-  return <Outlet />;
+  return <>{children}</>;
 }

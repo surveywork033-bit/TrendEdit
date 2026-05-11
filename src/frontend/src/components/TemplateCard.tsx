@@ -54,7 +54,7 @@ export function TemplateCard({
       {/* Image */}
       <div className="relative aspect-[4/3] overflow-hidden">
         <img
-          src={template.preview_image}
+          src={template.image_url}
           alt={template.title}
           className="w-full h-full object-cover transition-smooth"
           style={{ transform: hovered ? "scale(1.08)" : "scale(1)" }}
@@ -83,7 +83,7 @@ export function TemplateCard({
                 className="text-xs leading-snug line-clamp-3"
                 style={{ color: "oklch(0.85 0.02 240)" }}
               >
-                {template.prompt}
+                {template.prompt_text}
               </p>
             </motion.div>
           )}

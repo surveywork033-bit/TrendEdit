@@ -1,23 +1,25 @@
 {
-  "overview": "TrendEdit AI is a template gallery app where users can browse AI-style photo templates, filter by category, search by title, apply templates to uploaded images with a fake processing animation, and manage templates via a protected admin dashboard.",
+  "overview": "PromptVault is a dark, premium AI prompt inspiration gallery. Browse cinematic AI images with their full prompts in a real Pinterest-style masonry layout, copy prompts instantly with a toast notification, save favorites, and track your copy history. Admins can add, edit, and delete prompts via a protected dashboard.",
   "features": [
-    "Template gallery with 6 pre-seeded templates",
-    "Filter tabs: All, Trending, Popular, New",
-    "Real-time search by title",
-    "Image upload flow with fake processing animation",
-    "Protected admin dashboard with CRUD for templates",
-    "Admin login at /admin-login with hardcoded credentials",
-    "localStorage persistence for templates and auth"
+    "Pinterest-style masonry grid with natural image heights",
+    "Click any image to open a centered full-screen modal with large image and full prompt",
+    "Copy Prompt button with instant Copied! toast notification",
+    "Search bar + filter tabs (All, Trending, Popular, New)",
+    "Favorites and copy history saved in browser storage",
+    "Bottom navigation bar (Home, Profile)",
+    "Admin dashboard to add/edit/delete prompts (admin@test.com / 123456)",
+    "Dark modern UI with neon glow and OKLCH color system"
   ],
-  "category": "productivity",
+  "category": "gallery",
   "tags": [
-    "ai",
-    "templates",
-    "photo-editing",
+    "ai-prompts",
     "gallery",
-    "admin",
-    "react",
-    "tailwind"
+    "masonry",
+    "dark-ui",
+    "neon",
+    "pinterest-style",
+    "favorites",
+    "admin"
   ],
-  "last_updated": "2026-05-05T19:03:59.644Z"
+  "last_updated": "2026-05-09T04:02:11.312Z"
 }

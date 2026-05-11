@@ -1,5 +1,7 @@
+import { useAuthStore } from "@/store/useAuthStore";
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Sparkles, Zap } from "lucide-react";
+import { Home, Settings, User } from "lucide-react";
+import { Toaster } from "sonner";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -7,93 +9,119 @@ interface LayoutProps {
 
 export function Layout({ children }: LayoutProps) {
   const routerState = useRouterState();
-  const isAdminRoute = routerState.location.pathname.startsWith("/admin");
+  const pathname = routerState.location.pathname;
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const isAdminPage = pathname === "/admin" || pathname === "/admin-login";
 
   return (
     <div
       className="min-h-screen flex flex-col"
       style={{ background: "oklch(0.06 0 0)" }}
     >
-      {/* Header */}
-      <header
-        className="sticky top-0 z-50 border-b"
-        style={{
-          background: "oklch(0.10 0.01 265 / 0.9)",
-          backdropFilter: "blur(16px)",
-          WebkitBackdropFilter: "blur(16px)",
-          borderColor: "oklch(0.22 0.01 265 / 0.4)",
-        }}
-      >
-        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-          <Link
-            to="/"
-            className="flex items-center gap-2 group"
-            data-ocid="header.logo_link"
-          >
-            <div
-              className="w-8 h-8 rounded-lg flex items-center justify-center"
-              style={{
-                background:
-                  "linear-gradient(135deg, oklch(0.68 0.28 264), oklch(0.75 0.28 280))",
-              }}
-            >
-              <Zap className="w-4 h-4" style={{ color: "oklch(0.06 0 0)" }} />
-            </div>
-            <span
-              className="font-display font-bold text-lg tracking-tight"
-              style={{ color: "oklch(0.95 0.01 240)" }}
-            >
-              Trend<span style={{ color: "oklch(0.68 0.28 264)" }}>Edit</span>
-              <span
-                className="ml-1 text-xs font-mono"
-                style={{ color: "oklch(0.75 0.28 280)" }}
-              >
-                AI
-              </span>
-            </span>
-          </Link>
-
-          <div className="flex items-center gap-3">
-            {!isAdminRoute && (
-              <Link
-                to="/admin"
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-smooth"
-                style={{
-                  color: "oklch(0.75 0.28 280)",
-                  border: "1px solid oklch(0.75 0.28 280 / 0.3)",
-                }}
-                data-ocid="header.admin_link"
-              >
-                <Sparkles className="w-3 h-3" />
-                Admin
-              </Link>
-            )}
-          </div>
-        </div>
-      </header>
-
-      {/* Main */}
+      {/* Main content */}
       <main className="flex-1">{children}</main>
 
-      {/* Footer */}
-      <footer
-        className="border-t py-6 text-center text-sm"
-        style={{
-          background: "oklch(0.09 0.01 265)",
-          borderColor: "oklch(0.22 0.01 265 / 0.4)",
-          color: "oklch(0.55 0.01 260)",
-        }}
-      >
-        © {new Date().getFullYear()}. Built with love using{" "}
+      {/* Caffeine attribution */}
+      <div className="pb-20 flex justify-center py-4">
         <a
           href={`https://caffeine.ai?utm_source=caffeine-footer&utm_medium=referral&utm_content=${encodeURIComponent(typeof window !== "undefined" ? window.location.hostname : "")}`}
           target="_blank"
           rel="noopener noreferrer"
-          style={{ color: "oklch(0.68 0.28 264)" }}
+          className="text-[11px] text-muted-foreground/50 hover:text-muted-foreground/80 transition-colors duration-200"
         >
-          caffeine.ai
+          Built with love using caffeine.ai
         </a>
-      </footer>
+      </div>
+
+      {/* Admin shortcut — top right floating, hidden on admin pages */}
+      {!isAdminPage && (
+        <div className="fixed top-4 right-4 z-40">
+          <Link
+            to={isAuthenticated ? "/admin" : "/admin-login"}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold font-display transition-smooth"
+            style={{
+              background: "oklch(0.12 0.01 265 / 0.7)",
+              border: "1px solid oklch(0.28 0.02 265 / 0.3)",
+              color: "oklch(0.60 0.02 260)",
+              backdropFilter: "blur(12px)",
+              WebkitBackdropFilter: "blur(12px)",
+            }}
+            data-ocid="nav.admin_link"
+          >
+            <Settings size={12} />
+            Admin
+          </Link>
+        </div>
+      )}
+
+      {/* Bottom Navigation */}
+      <nav
+        className="fixed bottom-0 inset-x-0 z-50 flex items-center justify-around px-8 py-2"
+        style={{
+          background: "oklch(0.09 0.015 265 / 0.92)",
+          backdropFilter: "blur(20px)",
+          WebkitBackdropFilter: "blur(20px)",
+          borderTop: "1px solid oklch(0.22 0.01 265 / 0.4)",
+          boxShadow: "0 -8px 32px oklch(0.04 0 0 / 0.6)",
+        }}
+        data-ocid="nav.bottom"
+      >
+        <NavItem
+          to="/"
+          label="Home"
+          icon={<Home className="w-5 h-5" />}
+          active={pathname === "/"}
+          dataOcid="nav.home_link"
+        />
+        <NavItem
+          to="/profile"
+          label="Profile"
+          icon={<User className="w-5 h-5" />}
+          active={pathname === "/profile"}
+          dataOcid="nav.profile_link"
+        />
+      </nav>
+
+      <Toaster
+        position="top-center"
+        toastOptions={{
+          style: {
+            background: "oklch(0.12 0.015 265)",
+            border: "1px solid oklch(0.28 0.02 265 / 0.4)",
+            color: "oklch(0.92 0.01 240)",
+          },
+        }}
+      />
     </div>
+  );
+}
+
+function NavItem({
+  to,
+  label,
+  icon,
+  active,
+  dataOcid,
+}: {
+  to: string;
+  label: string;
+  icon: React.ReactNode;
+  active: boolean;
+  dataOcid: string;
+}) {
+  return (
+    <Link
+      to={to}
+      className="flex flex-col items-center gap-1 min-w-[60px] py-1.5 px-4 rounded-xl transition-smooth"
+      style={{
+        color: active ? "oklch(0.75 0.28 280)" : "oklch(0.50 0.01 260)",
+        background: active ? "oklch(0.75 0.28 280 / 0.10)" : "transparent",
+        boxShadow: active ? "0 0 16px oklch(0.75 0.28 280 / 0.15)" : "none",
+      }}
+      data-ocid={dataOcid}
+    >
+      {icon}
+      <span className="text-[10px] font-medium">{label}</span>
+    </Link>
   );
 }
